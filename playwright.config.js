@@ -12,8 +12,8 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined, // Auto-detect workers for parallel execution
+  /* Auto-detect workers for parallel execution */
+  workers: process.env.CI ? 1 : undefined, // Auto-detect workers for best performance
   /* Reporter to use - minimal for speed */
   reporter: [
     ['list'], // Faster than HTML reporter
