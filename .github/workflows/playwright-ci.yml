@@ -1,0 +1,203 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Run tests on multiple Node.js versions
+        node-version: [18, 20]
+        # Run tests on different browsers
+        browser: [chromium, firefox, webkit]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps ${{ matrix.browser }}
+      
+    - name: Run Playwright tests
+      run: npx playwright test --project=${{ matrix.browser }}
+      env:
+        CI: true
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-report-${{ matrix.browser }}-node${{ matrix.node-version }}
+        path: |
+          playwright-report/
+          test-results/
+        retention-days: 30
+        
+    - name: Upload test artifacts on failure
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: playwright-screenshots-${{ matrix.browser }}-node${{ matrix.node-version }}
+        path: |
+          test-results/
+          screenshots/
+        retention-days: 7
+
+  # Job to run API tests separately
+  api-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright
+      run: npx playwright install chromium
+      
+    - name: Run API tests only
+      run: npx playwright test api-tests.spec.js
+      
+    - name: Upload API test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: api-test-results
+        path: |
+          test-results.json
+          test-results.xml
+        retention-days: 30
+
+  # Job to run tests in headed mode for debugging
+  debug-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[debug]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+      
+    - name: Run tests in debug mode
+      run: |
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        npx playwright test --headed --project=chromium
+        
+    - name: Upload debug artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: debug-test-results
+        path: |
+          playwright-report/
+          test-results/
+          screenshots/
+        retention-days: 7
+
+  # Merge reports from different browsers
+  merge-reports:
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: all-artifacts
+        
+    - name: Merge reports
+      run: |
+        mkdir -p merged-report
+        # Copy all reports to merged directory
+        find all-artifacts -name "*.html" -exec cp {} merged-report/ \;
+        find all-artifacts -name "*.json" -exec cp {} merged-report/ \;
+        
+    - name: Upload merged report
+      uses: actions/upload-artifact@v4
+      with:
+        name: merged-playwright-report
+        path: merged-report/
+        retention-days: 30
+
+  # Performance testing job
+  performance-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[perf]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright
+      run: npx playwright install chromium
+      
+    - name: Run performance tests
+      run: npx playwright test --grep="performance|load|speed"
+      
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: test-results/
+        retention-days: 30
