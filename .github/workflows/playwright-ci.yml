@@ -83,7 +83,7 @@ jobs:
       run: npx playwright install chromium
       
     - name: Run API tests only
-      run: npx playwright test api-tests.spec.js
+      run: npx playwright test TS001_signup.spec.js
       
     - name: Upload API test results
       uses: actions/upload-artifact@v4
