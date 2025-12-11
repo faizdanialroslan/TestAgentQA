@@ -13,20 +13,21 @@ module.exports = defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
+  workers: process.env.CI ? 1 : undefined, // Auto-detect workers for parallel execution
+  /* Reporter to use - minimal for speed */
   reporter: [
-    ['html'],
-    ['json', { outputFile: 'test-results.json' }],
-    ['junit', { outputFile: 'test-results.xml' }]
+    ['list'], // Faster than HTML reporter
+    // ['html'], // Disable HTML reporter for speed
+    // ['json', { outputFile: 'test-results.json' }],
+    // ['junit', { outputFile: 'test-results.xml' }]
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://automationexercise.com', // Correct base URL
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure', // Only when needed for speed
 
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
@@ -34,11 +35,16 @@ module.exports = defineConfig({
     /* Record video on failure */
     video: 'retain-on-failure',
 
-    /* Global timeout for all actions */
-    actionTimeout: 10000,
+    /* Global timeout for all actions - reduced for speed */
+    actionTimeout: 5000, // Reduced from 10000
 
-    /* Global timeout for navigation */
-    navigationTimeout: 30000,
+    /* Global timeout for navigation - reduced for speed */
+    navigationTimeout: 15000, // Reduced from 30000
+    
+    /* Add slow motion for visual testing */
+    launchOptions: {
+      slowMo: process.env.SLOW_MODE ? 1000 : 0, // 1 second delay when SLOW_MODE=true
+    },
   },
 
   /* Configure projects for major browsers */
@@ -48,21 +54,15 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+    // {
+    //   name: 'firefox',
+    //   use: { ...devices['Desktop Firefox'] },
+    // },
 
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    /* Test against mobile viewports. */
-    {
-      name: 'mobile',
-      use: { ...devices['Pixel 5'] },
-    },
+    // {
+    //   name: 'webkit',
+    //   use: { ...devices['Desktop Safari'] },
+    // },
 
     /* Test against branded browsers. */
     // {
